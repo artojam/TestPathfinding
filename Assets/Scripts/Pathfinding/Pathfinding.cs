@@ -1,12 +1,8 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Buffers;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using System.Linq;
-using UnityEngine.UIElements;
-using UnityEditor.Experimental.GraphView;
+
 
 public class Pathfinding : MonoBehaviour
 {
@@ -15,18 +11,18 @@ public class Pathfinding : MonoBehaviour
 
     // временно публичные надо зделать конструктор
     public byte[] grid;
-    
+
     public int gridWidth;
     public int gridHeight;
-    
+
     public Vector2Int gridOffset;
 
-
-
-    private int[,] directions = { { 0, 1 }, { 1, 0 }, { 1, 1 }, { 0, -1 }, { -1, 0 }, { -1, -1 }, { -1, 1 }, { 1, -1 } };
-
-    private PriorityQueue<Node> WaitingNodes = new PriorityQueue<Node>(); // хранит узлы для проверки
-    private HashSet<Vector2Int> CheckedNodes = new HashSet<Vector2Int>(); // хранит провереные позиции
+    private int[,] directions = {
+        { 0, 1 },
+        { 1, 0 },
+        { 0, -1 },
+        { -1, 0 },
+    };
 
     // генерация сетки по Tilemap
     public static void GenerateGridFromTilemap(
@@ -39,53 +35,59 @@ public class Pathfinding : MonoBehaviour
     {
         gridBuffer = new byte[_sizeRoom.x * _sizeRoom.y];
         BoundsInt bounds = tilemap.cellBounds;
-        Vector2Int offsetRoom = (posRoom - _sizeRoom / 2);
+        Vector2Int offsetRoom = posRoom - (_sizeRoom / 2);
 
         for (int x = 0; x < _sizeRoom.x; x++)
         {
             for (int y = 0; y < _sizeRoom.y; y++)
             {
-                Vector3Int tilePosition = new Vector3Int(offsetRoom.x + x, offsetRoom.y + y, 0);
+                Vector3Int tilePosition = new Vector3Int(offsetRoom.x + x - posRoom.x, offsetRoom.y + y - posRoom.y, 0);
+                Debug.Log(tilePosition);
                 TileBase tile = tilemap.GetTile(tilePosition);
                 gridBuffer[x * _sizeRoom.x + y] = tile == Floor ? (byte)0 : (byte)255;
             }
         }
     }
 
-    // поиск пути немного улучшеный A*
-    public int FindPath(Vector3 start, Vector3 target, ref Vector3[] pathBuffer)
+    public void Init()
     {
         
-        Vector2Int posStart = GetGridPosition(start);
-        Vector2Int posTarget = GetGridPosition(target);
+    }
 
-        if (GetToLine(posStart, posTarget))
+    // поиск пути немного улучшеный A*
+    public int FindPath(Vector3 posStart, Vector3 posEnd, ref Vector3[] pathPointsBuffer)
+    {
+        if (HasObstacleBetweenWorld(posStart, posEnd))
         {
-            pathBuffer[0] = target;
+            pathPointsBuffer[0] = posEnd;
             return 1;
         }
 
-        WaitingNodes.Clear();
-        CheckedNodes.Clear();
+        Vector2Int gridPosStart = GetGridPosition(posStart);
+        Vector2Int gridPosEnd = GetGridPosition(posEnd);
+
+        PriorityQueue<Node> WaitingNodes = new PriorityQueue<Node>(); // хранит узлы для проверки
+        HashSet<Vector2Int> CheckedNodes = new HashSet<Vector2Int>(); // хранит провереные позиции
+
         Node[] parentNodes = new Node[grid.Length / 2];
 
-        Node startNode = new Node(0, posStart, posTarget, -1);
+        Node startNode = new Node(0, gridPosStart, gridPosEnd, -1);
         CheckedNodes.Add(startNode.pos);
 
-        GetNeighbourNodes(startNode, posTarget, ref WaitingNodes, CheckedNodes, ref parentNodes, 0);
+        GetNeighbourNodes(startNode, gridPosEnd, ref WaitingNodes, CheckedNodes, ref parentNodes, 0);
 
         for (int length = 1; length < grid.Length; length++)
         {
             Node currentNode = WaitingNodes.Dequeue();
 
-            if (currentNode.pos == posTarget)
+            if (currentNode.pos == gridPosEnd)
             {
-                int lengthBuffer = CalculatePathFromNode(currentNode, start, ref pathBuffer, parentNodes);
-                Array.Reverse(pathBuffer);
+                int lengthBuffer = CalculatePathFromNode(currentNode, posStart, ref pathPointsBuffer, parentNodes);
+                Array.Reverse(pathPointsBuffer);
                 return lengthBuffer;
             }
 
-            GetNeighbourNodes(currentNode, posTarget, ref WaitingNodes, CheckedNodes, ref parentNodes, length);
+            GetNeighbourNodes(currentNode, gridPosEnd, ref WaitingNodes, CheckedNodes, ref parentNodes, length);
         }
         return 0;
     }
@@ -110,9 +112,9 @@ public class Pathfinding : MonoBehaviour
                 {
                     WaitingNodesBuffer.Enqueue(newNode);
                     CheckedNodes.Add(newNode.pos);
-                    
+
                 }
-                
+
             }
         }
 
@@ -120,36 +122,28 @@ public class Pathfinding : MonoBehaviour
 
     }
 
-    private Vector2Int GetNeighbour(Vector2Int pos)
-    {
-        for (int i = 0; i < directions.GetLength(0); i++)
-        {
-            Vector2Int dir = new Vector2Int(directions[i, 0], directions[i, 1]);
-
-            if (grid[(pos.x + dir.x) * gridWidth + (pos.y + dir.y)] == 255)
-                return dir;
-        }
-        return new Vector2Int(0, 0);
-    }
 
     // строит и зглаживает путь [Временное решение]
     private int CalculatePathFromNode(Node node, Vector3 posStart, ref Vector3[] pathBuffer, Node[] parentNodesBuffer)
     {
         //if (node == null) return 0;
-        
+
         int indexNode = 0;
 
         Node currentNode = node;
         Node oldNode = new Node();
 
+        Vector2Int gridPosStart = GetGridPosition(posStart);
         Vector2Int endPos = node.pos;
 
         bool isPathToEnd = true;
 
+
+
         pathBuffer[indexNode].x = GetWorldAxis(currentNode.pos.x);
         pathBuffer[indexNode].y = GetWorldAxis(currentNode.pos.y);
 
-        DrawPoint(pathBuffer[indexNode], Color.green);
+        //DrawPoint(pathBuffer[indexNode], Color.green);
 
         indexNode++;
 
@@ -158,31 +152,27 @@ public class Pathfinding : MonoBehaviour
 
         while (isPathToEnd)
         {
-            if (GetToLineWorld(currentNode, posStart))
+            if (HasObstacleBetweenNodeToWorld(currentNode, posStart))
             {
-                Vector2Int dir = GetNeighbour(oldNode.pos);
-                pathBuffer[indexNode].x = GetWorldAxis(oldNode.pos.x) + 0.5f * -dir.x;
-                pathBuffer[indexNode].y = GetWorldAxis(oldNode.pos.y) + 0.5f * -dir.y;
-                
+                pathBuffer[indexNode].x = GetWorldAxis(oldNode.pos.x);// + 0.25f * -dir.x;
+                pathBuffer[indexNode].y = GetWorldAxis(oldNode.pos.y);// + 0.25f * -dir.y;
+
                 //DrawPoint(pathBuffer[indexNode], Color.green);
-                
+
                 indexNode++;
-                if (Vector3.Distance(posStart, GetWorldPosition(currentNode.pos)) > 0.5f)
-                {
-                    dir = GetNeighbour(currentNode.pos);
-                    pathBuffer[indexNode].x = GetWorldAxis(currentNode.pos.x) + 0.5f * -dir.x;
-                    pathBuffer[indexNode].y = GetWorldAxis(currentNode.pos.y) + 0.5f * -dir.y;
 
-                    //DrawPoint(pathBuffer[indexNode], Color.white);
+                pathBuffer[indexNode].x = GetWorldAxis(currentNode.pos.x);// + 0.25f * -dir.x;
+                pathBuffer[indexNode].y = GetWorldAxis(currentNode.pos.y);// + 0.25f * -dir.y;
 
-                    indexNode++;
-                }
+                //DrawPoint(pathBuffer[indexNode], Color.white);
+
+                indexNode++;
 
                 isPathToEnd = false;
                 return indexNode;
             }
 
-            if (GetToLine(currentNode.pos, endPos))
+            if (PseudoLinecast(currentNode.pos, endPos))
             {
                 oldNode = currentNode;
                 currentNode = parentNodesBuffer[currentNode.indexParent];
@@ -191,15 +181,14 @@ public class Pathfinding : MonoBehaviour
             else
             {
 
-                Vector2Int dir = GetNeighbour(oldNode.pos);
-                pathBuffer[indexNode].x = GetWorldAxis(oldNode.pos.x) + 0.5f * -dir.x;
-                pathBuffer[indexNode].y = GetWorldAxis(oldNode.pos.y) + 0.5f * -dir.y;
+                pathBuffer[indexNode].x = GetWorldAxis(oldNode.pos.x);
+                pathBuffer[indexNode].y = GetWorldAxis(oldNode.pos.y);
 
 
                 //DrawPoint(pathBuffer[indexNode], Color.green);
 
                 indexNode++;
-                
+
                 endPos = oldNode.pos;
                 oldNode = currentNode;
 
@@ -209,6 +198,33 @@ public class Pathfinding : MonoBehaviour
 
         return indexNode;
     }
+
+    public bool PseudoLinecast(Vector2Int start, Vector2Int end)
+    {
+        int width = gridWidth;
+        int height = gridHeight;
+
+        int dx = Mathf.Abs(end.x - start.x), dy = Mathf.Abs(end.y - start.y);
+        int sx = (start.x < end.x) ? 1 : -1, sy = (start.y < end.y) ? 1 : -1;
+        int err = dx - dy;
+
+        Vector2Int pos = start;
+
+        while (true)
+        {
+
+            if (grid[pos.x * gridWidth + pos.y] == 255)
+                return false;
+
+            if (pos == end)
+                return true;
+
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; pos.x += sx; }
+            if (e2 < dx) { err += dx; pos.y += sy; }
+        }
+    }
+
 
     public void DrawPoint(Vector2Int pos, Color color)
     {
@@ -240,7 +256,9 @@ public class Pathfinding : MonoBehaviour
             5f);
     }
 
-    public bool GetToLine(Vector2Int posStart, Vector2Int posEnd)
+
+
+    public bool HasObstacleBetweenGrid(Vector2Int posStart, Vector2Int posEnd)
     {
         Vector3 posWorldStart = GetWorldPosition(posStart);
         Vector3 posWorldEnd = GetWorldPosition(posEnd);
@@ -250,7 +268,7 @@ public class Pathfinding : MonoBehaviour
         return target.collider == null;
     }
 
-    public bool GetToLineWorld(Node node, Vector3 posEnd)
+    public bool HasObstacleBetweenNodeToWorld(Node node, Vector3 posEnd)
     {
         Vector2 posWorldStart = new Vector2(node.pos.x + gridOffset.x, node.pos.y + gridOffset.y);
 
@@ -259,8 +277,25 @@ public class Pathfinding : MonoBehaviour
         return target.collider == null;
     }
 
-    public bool GetToLineWorld(Vector3 posStart, Vector3 posEnd) =>
+    public bool HasObstacleBetweenWorld(Vector3 posStart, Vector3 posEnd) =>
         Physics2D.Linecast(posStart, posEnd, layer).collider == null;
+
+    public Vector3 CheckDirWallsAround(Vector3 posAgent)
+    {
+        Collider2D hit = Physics2D.OverlapCircle(posAgent, 0.45f, layer);
+        if (hit != null)
+        {
+            Vector3 closestPoint = hit.ClosestPoint(posAgent);
+
+            // Вычисляем направление от центра круга к точке столкновения
+            Vector3 dir = (closestPoint - posAgent).normalized;
+
+            return dir;
+        }
+
+        return Vector3.zero;
+    }
+
 
     public Vector2Int GetGridPosition(Vector3 worldPosition)
     {
@@ -270,75 +305,11 @@ public class Pathfinding : MonoBehaviour
         return new Vector2Int(x, y);
     }
 
-    public Vector3 GetWorldPosition(Vector2Int gridPosition) => 
+    public Vector3 GetWorldPosition(Vector2Int gridPosition) =>
         new Vector3(gridPosition.x + gridOffset.x, gridPosition.y + gridOffset.y);
 
     public float GetWorldAxis(int axis) => axis + gridOffset.x;
 
-    // временно находится здесь надо зделать отдельный класс агента
-    public IEnumerator AgentMove(Rigidbody2D agent, Transform target, float speed, string name)
-    {
-        Vector3 lastTargetPos = target.position;
-        Vector3[] path = new Vector3[(gridHeight)];
-        
-        
-        int length = FindPath(agent.position, lastTargetPos, ref path);
-        int index = gridHeight - length;
-
-        Vector3 nextPoint = path[index];
-        Vector2 dir;
-
-        while (true)
-        {
-            // Если агент дошёл до последней точки и target не двигается, он должен стоять
-            if (index >= length + gridHeight - length && Vector3.Distance(agent.position, target.position) <= 0.5f)
-            {
-                agent.velocity = Vector2.zero;
-                yield return null; // Ждём, пока target не двинется
-                continue;
-            }
-            
-            // Если target сменил позицию, пересчитываем путь
-            if (index >= length + gridHeight - length - 1 || Vector3.Distance(lastTargetPos, target.position) > 0.05f)
-            {
-                if (GetToLineWorld(agent.position, target.position))
-                {
-                    lastTargetPos = target.position;
-                    length = 1;
-                    path[gridHeight - length] = target.position;
-                    
-                    index = gridHeight - length;
-                }
-                else
-                {
-                    lastTargetPos = target.position;
-                    length = FindPath(agent.position, lastTargetPos, ref path);
-                    index = gridHeight - length;
-                }
-            }            
-            
-            // Двигаемся к следующей точке пути
-            nextPoint = path[index];
-            dir = ((Vector2)nextPoint - agent.position).normalized;
-            agent.MovePosition(agent.position + (dir * speed * Time.fixedDeltaTime));
-
-            if (grid[GetGridPosition(agent.position).x * gridWidth + GetGridPosition(agent.position).y] == 255)
-            {
-                Debug.Log("Wall");
-            }
-
-
-            Debug.DrawLine(agent.position, nextPoint, Color.green, 0.05f);
-
-            // Если достигли текущей точки пути, переходим к следующей
-            if (Vector3.Distance(agent.position, nextPoint) <= 0.05f && index < length + gridHeight - length - 1)
-            {
-                index++;
-            }
-
-            yield return new WaitForFixedUpdate();
-        }
-    }
 }
 
 [Serializable]

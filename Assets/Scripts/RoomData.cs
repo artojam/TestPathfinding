@@ -31,7 +31,7 @@ public class RoomData : MonoBehaviour
         path.gridOffset = offset;
     }
 
-    /*private void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
         if (Application.isPlaying)
         {
@@ -42,11 +42,18 @@ public class RoomData : MonoBehaviour
                 for (int y = 0; y < size.y; y++)
                 {
                     Vector3 pos = new Vector3(_offset.x + x, _offset.y + y, 0);
+                    Gizmos.color = Color.blue;
                     if (grid[x * size.x + y] < 255)
                         Gizmos.DrawSphere(pos, 0.2f);
+                    else
+                    {
+                        Gizmos.color = Color.red;
+                        Gizmos.DrawSphere(pos, 0.2f);
+                    }
+
                 }
             } 
         }
         return;
-    }*/
+    }
 }

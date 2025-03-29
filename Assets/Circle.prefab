@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 8822058117899952076}
   - component: {fileID: 5418646125283373523}
   - component: {fileID: 2166990875528423369}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Circle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -29,7 +29,7 @@ Transform:
   m_GameObject: {fileID: 3933945814488596273}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 4, y: 4, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -76,8 +76,8 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 1
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
-  m_Color: {r: 0.5566038, g: 0.19166073, b: 0.19166073, a: 1}
+  m_Sprite: {fileID: -1583317905, guid: 83b83c543a3cad14b95565c1effb510e, type: 3}
+  m_Color: {r: 0.3584906, g: 0.26886794, b: 0.26886794, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -161,6 +161,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 67db8199757958340b8c47e403672827, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 2.5
+  speed: 25
   target: {fileID: 0}
-  path: {fileID: 0}
+  pathfinding: {fileID: 0}

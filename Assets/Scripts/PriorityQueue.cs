@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 [Serializable]
 public class PriorityQueue<Node> where Node : IComparable<Node>
