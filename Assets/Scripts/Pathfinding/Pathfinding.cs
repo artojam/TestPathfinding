@@ -35,23 +35,27 @@ public class Pathfinding : MonoBehaviour
     {
         gridBuffer = new byte[_sizeRoom.x * _sizeRoom.y];
         BoundsInt bounds = tilemap.cellBounds;
-        Vector2Int offsetRoom = posRoom - (_sizeRoom / 2);
+        Vector2Int offsetRoom = posRoom - (_sizeRoom / 2) + (posRoom / -4);
 
         for (int x = 0; x < _sizeRoom.x; x++)
         {
             for (int y = 0; y < _sizeRoom.y; y++)
             {
-                Vector3Int tilePosition = new Vector3Int(offsetRoom.x + x - posRoom.x, offsetRoom.y + y - posRoom.y, 0);
-                Debug.Log(tilePosition);
+                Vector3Int tilePosition = new Vector3Int(offsetRoom.x + x, offsetRoom.y + y, 0);
                 TileBase tile = tilemap.GetTile(tilePosition);
                 gridBuffer[x * _sizeRoom.x + y] = tile == Floor ? (byte)0 : (byte)255;
             }
         }
     }
 
-    public void Init()
+    public void InitGrid(byte[] _grid, int _gridWidth, int _gridHeight, Vector2Int _gridOffset)
     {
-        
+        grid = _grid;
+
+        gridWidth = _gridWidth;
+        gridHeight = _gridHeight;
+
+        gridOffset = _gridOffset;
     }
 
     // поиск пути немного улучшеный A*
@@ -247,13 +251,13 @@ public class Pathfinding : MonoBehaviour
                 pos - new Vector3(0, 0.25f),
                 pos + new Vector3(0, 0.25f),
                 color,
-                5f);
+                25f);
 
         Debug.DrawLine(
             pos - new Vector3(0.25f, 0),
             pos + new Vector3(0.25f, 0),
             color,
-            5f);
+            25f);
     }
 
 
